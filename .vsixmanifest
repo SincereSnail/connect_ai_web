@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+	<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
+		<Metadata>
+			<Identity Language="en-US" Id="connect-ai-lab" Version="2.89.58" Publisher="connectailab" />
+			<DisplayName>Connect AI — AI 1인 기업 · 나만의 에이전트 팀 · 제2의 두뇌</DisplayName>
+			<Description xml:space="preserve">AI 1인 기업가를 위한 워크스페이스. 나만의 AI 에이전트 팀과 제2의 두뇌가 한 곳에서 — CEO + 전문 에이전트들이 내 지식·결정 로그·메모리를 컨텍스트로 24시간 미션 향해 자동으로 일합니다. 100% 로컬·오프라인·무료.</Description>
+			<Tags>ai,local,ollama,lmstudio,gemma,llama,deepseek,offline,agent,agent-team,second-brain,1인기업,solopreneur,code-generation,connect-ai-lab,copilot,keybindings</Tags>
+			<Categories>Machine Learning,Programming Languages,Chat</Categories>
+			<GalleryFlags>Public</GalleryFlags>
+			
+			<Properties>
+				<Property Id="Microsoft.VisualStudio.Code.Engine" Value="^1.80.0" />
+				<Property Id="Microsoft.VisualStudio.Code.ExtensionDependencies" Value="" />
+				<Property Id="Microsoft.VisualStudio.Code.ExtensionPack" Value="" />
+				<Property Id="Microsoft.VisualStudio.Code.ExtensionKind" Value="workspace" />
+				<Property Id="Microsoft.VisualStudio.Code.LocalizedLanguages" Value="" />
+				<Property Id="Microsoft.VisualStudio.Code.EnabledApiProposals" Value="" />
+				
+				<Property Id="Microsoft.VisualStudio.Code.ExecutesCode" Value="true" />
+				
+				<Property Id="Microsoft.VisualStudio.Services.Links.Source" Value="https://github.com/wonseokjung/connect-ai.git" />
+				<Property Id="Microsoft.VisualStudio.Services.Links.Getstarted" Value="https://github.com/wonseokjung/connect-ai.git" />
+				<Property Id="Microsoft.VisualStudio.Services.Links.GitHub" Value="https://github.com/wonseokjung/connect-ai.git" />
+				<Property Id="Microsoft.VisualStudio.Services.Links.Support" Value="https://github.com/wonseokjung/connect-ai/issues" />
+				<Property Id="Microsoft.VisualStudio.Services.Links.Learn" Value="https://github.com/wonseokjung/connect-ai#readme" />
+				
+				
+				<Property Id="Microsoft.VisualStudio.Services.GitHubFlavoredMarkdown" Value="true" />
+				<Property Id="Microsoft.VisualStudio.Services.Content.Pricing" Value="Free"/>
+
+				
+				
+			</Properties>
+			<License>extension/LICENSE.txt</License>
+			<Icon>extension/assets/icon.png</Icon>
+		</Metadata>
+		<Installation>
+			<InstallationTarget Id="Microsoft.VisualStudio.Code"/>
+		</Installation>
+		<Dependencies/>
+		<Assets>
+			<Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true" />
+			<Asset Type="Microsoft.VisualStudio.Services.Content.Details" Path="extension/readme.md" Addressable="true" />
+<Asset Type="Microsoft.VisualStudio.Services.Content.License" Path="extension/LICENSE.txt" Addressable="true" />
+<Asset Type="Microsoft.VisualStudio.Services.Icons.Default" Path="extension/assets/icon.png" Addressable="true" />
+		</Assets>
+	</PackageManifest>
