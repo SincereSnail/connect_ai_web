@@ -8,6 +8,7 @@ const PORT = Number(process.env.PORT || 4825);
 const DATA_DIR = path.join(ROOT, "web-data");
 const CONFIG_PATH = path.join(DATA_DIR, "config.json");
 const HISTORY_PATH = path.join(DATA_DIR, "history.json");
+const COMPANY_PATH = path.join(DATA_DIR, "company.json");
 
 const DEFAULT_CONFIG = {
   ollamaUrl: "http://127.0.0.1:11434",
@@ -20,9 +21,23 @@ const DEFAULT_CONFIG = {
 
 const clients = new Set();
 let chatHistory = loadJson(HISTORY_PATH, []);
+let companyConfig = loadJson(COMPANY_PATH, {});
 let lastPrompt = "";
 let lastModel = "";
 let abortController = null;
+
+const AGENTS = [
+  { id: "ceo", name: "CEO", role: "Chief Executive Agent", emoji: "🧭", color: "#F8FAFC", tagline: "회사 전체 의사결정과 작업 분배를 맡습니다" },
+  { id: "youtube", name: "레오", role: "Head of YouTube", emoji: "📺", color: "#FF4444", tagline: "유튜브 채널 기획과 운영을 책임집니다" },
+  { id: "instagram", name: "Instagram", role: "Head of Instagram", emoji: "📷", color: "#E1306C", tagline: "인스타 콘텐츠와 참여 전략을 끌어올립니다" },
+  { id: "designer", name: "Designer", role: "Lead Designer", emoji: "🎨", color: "#A78BFA", tagline: "브랜드와 시각 자산 디자인을 담당합니다" },
+  { id: "developer", name: "Developer", role: "Lead Engineer", emoji: "💻", color: "#22D3EE", tagline: "코드와 자동화 스크립트를 작성합니다" },
+  { id: "business", name: "Business", role: "Head of Business", emoji: "💰", color: "#F5C518", tagline: "수익화, 가격, 전략 의사결정을 봅니다" },
+  { id: "secretary", name: "영숙", role: "비서 · Personal Assistant", emoji: "📱", color: "#84CC16", tagline: "일정, 할 일, 보고를 정리합니다" },
+  { id: "editor", name: "Editor", role: "Video & Content Editor", emoji: "✂️", color: "#F472B6", tagline: "영상 편집 방향과 콘텐츠를 다듬습니다" },
+  { id: "writer", name: "Writer", role: "Copywriter", emoji: "✍️", color: "#FBBF24", tagline: "카피, 스크립트, 후크를 글로 풀어냅니다" },
+  { id: "researcher", name: "Researcher", role: "Trend & Data Researcher", emoji: "🔍", color: "#60A5FA", tagline: "트렌드와 데이터를 모아 사실 확인까지 돕습니다" }
+];
 
 ensureDir(DATA_DIR);
 ensureDir(DEFAULT_CONFIG.localBrainPath);
@@ -46,6 +61,51 @@ function saveJson(file, value) {
 
 function getConfig() {
   return { ...DEFAULT_CONFIG, ...loadJson(CONFIG_PATH, {}) };
+}
+
+function getCompanyDir() {
+  return path.join(getConfig().localBrainPath, "_company");
+}
+
+function companyState(extra = {}) {
+  const dir = getCompanyDir();
+  return {
+    type: "corporateState",
+    configured: !!companyConfig.configured,
+    companyName: companyConfig.companyName || "",
+    companyDir: dir,
+    folderExists: fs.existsSync(dir),
+    brainExplicitlySet: true,
+    companyDay: 1,
+    ...extra
+  };
+}
+
+function ensureCompanyStructure() {
+  const dir = getCompanyDir();
+  for (const rel of ["_shared", "_agents", "sessions"]) {
+    ensureDir(path.join(dir, rel));
+  }
+  return dir;
+}
+
+function saveCompanyConfig(next) {
+  companyConfig = { ...companyConfig, ...next };
+  saveJson(COMPANY_PATH, companyConfig);
+}
+
+function postCorporateReady() {
+  const dir = ensureCompanyStructure();
+  post({
+    type: "corporateReady",
+    agents: AGENTS,
+    companyDir: dir,
+    configured: !!companyConfig.configured,
+    companyName: companyConfig.companyName || "",
+    folderExists: true,
+    brainExplicitlySet: true,
+    companyDay: 1
+  });
 }
 
 function post(type, value) {
@@ -535,8 +595,80 @@ async function handleMessage(msg) {
       post({ type: "ideModelsProbed", models: [], error: "웹 버전에서는 IDE 모델 API가 없습니다." });
       break;
     case "corporateInit":
-      post("companyState", { ok: true, web: true });
+      if (fs.existsSync(getCompanyDir())) postCorporateReady();
+      else post(companyState());
       break;
+    case "companySetup": {
+      const dir = ensureCompanyStructure();
+      postCorporateReady();
+      post(companyState({
+        note: `👔 회사 폴더 준비 완료: ${dir}`
+      }));
+      break;
+    }
+    case "companyInterview": {
+      const answers = msg.answers || {};
+      const companyName = String(answers.name || companyConfig.companyName || "AI 1인 기업").trim();
+      const dir = ensureCompanyStructure();
+      saveCompanyConfig({
+        configured: true,
+        companyName,
+        oneLiner: String(answers.oneLiner || companyConfig.oneLiner || "").trim(),
+        audience: String(answers.audience || companyConfig.audience || "").trim(),
+        goalYear: String(answers.goalYear || companyConfig.goalYear || "").trim(),
+        goalMonth: String(answers.goalMonth || companyConfig.goalMonth || "").trim(),
+        needs: String(answers.needs || companyConfig.needs || "").trim(),
+        updatedAt: new Date().toISOString()
+      });
+      const summary = [
+        `# ${companyName}`,
+        "",
+        `- 한 줄 소개: ${companyConfig.oneLiner || ""}`,
+        `- 대상: ${companyConfig.audience || ""}`,
+        `- 올해 목표: ${companyConfig.goalYear || ""}`,
+        `- 이번 달 목표: ${companyConfig.goalMonth || ""}`,
+        `- 필요한 것: ${companyConfig.needs || ""}`
+      ].join("\n");
+      fs.writeFileSync(path.join(dir, "_shared", "company.md"), summary, "utf8");
+      postCorporateReady();
+      post(companyState({
+        configured: true,
+        companyName,
+        folderExists: true,
+        note: `✅ ${companyName} 설정 완료. 명령을 내려보세요.`
+      }));
+      break;
+    }
+    case "loadCompanyConfig":
+      post({
+        type: "companyConfigLoaded",
+        config: {
+          name: companyConfig.companyName || "",
+          oneLiner: companyConfig.oneLiner || "",
+          audience: companyConfig.audience || "",
+          goalYear: companyConfig.goalYear || "",
+          goalMonth: companyConfig.goalMonth || "",
+          needs: companyConfig.needs || ""
+        }
+      });
+      break;
+    case "saveCompanyConfig": {
+      const cfg = msg.config || {};
+      saveCompanyConfig({
+        configured: true,
+        companyName: String(cfg.name || cfg.companyName || companyConfig.companyName || "AI 1인 기업").trim(),
+        oneLiner: String(cfg.oneLiner || companyConfig.oneLiner || "").trim(),
+        audience: String(cfg.audience || companyConfig.audience || "").trim(),
+        goalYear: String(cfg.goalYear || companyConfig.goalYear || "").trim(),
+        goalMonth: String(cfg.goalMonth || companyConfig.goalMonth || "").trim(),
+        needs: String(cfg.needs || companyConfig.needs || "").trim(),
+        updatedAt: new Date().toISOString()
+      });
+      post({ type: "companyConfigSaved", ok: true });
+      postCorporateReady();
+      post(companyState({ configured: true, companyName: companyConfig.companyName }));
+      break;
+    }
     default:
       post("log", `웹 어댑터: 아직 연결되지 않은 메시지 타입 ${msg.type}`);
   }
