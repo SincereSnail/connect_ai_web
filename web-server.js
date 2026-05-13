@@ -94,6 +94,32 @@ function saveCompanyConfig(next) {
   saveJson(COMPANY_PATH, companyConfig);
 }
 
+function writeCompanySharedFiles() {
+  const dir = ensureCompanyStructure();
+  const shared = path.join(dir, "_shared");
+  const identity = [
+    `# ${companyConfig.companyName || "AI 1인 기업"} Identity`,
+    "",
+    `- **회사명:** ${companyConfig.companyName || ""}`,
+    `- **한 줄 소개:** ${companyConfig.oneLiner || ""}`,
+    `- **타깃 청중:** ${companyConfig.audience || ""}`,
+    `- **브랜드 톤:** ${companyConfig.tone || ""}`,
+    `- **금기:** ${companyConfig.taboos || ""}`,
+    ""
+  ].join("\n");
+  const goals = [
+    "# Goals",
+    "",
+    `- **올해 핵심 목표:** ${companyConfig.goalYear || ""}`,
+    `- **이번 달 목표:** ${companyConfig.goalMonth || ""}`,
+    `- **지금 필요한 것:** ${companyConfig.needs || ""}`,
+    ""
+  ].join("\n");
+  fs.writeFileSync(path.join(shared, "identity.md"), identity, "utf8");
+  fs.writeFileSync(path.join(shared, "goals.md"), goals, "utf8");
+  fs.writeFileSync(path.join(shared, "company.md"), `${identity}\n${goals}`, "utf8");
+}
+
 function postCorporateReady() {
   const dir = ensureCompanyStructure();
   post({
@@ -525,6 +551,20 @@ function runCommand(command, cwd, timeoutMs) {
   });
 }
 
+function openFolder(folderPath) {
+  const opener = process.platform === "win32"
+    ? "explorer.exe"
+    : process.platform === "darwin"
+      ? "open"
+      : "xdg-open";
+  const child = spawn(opener, [folderPath], {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true
+  });
+  child.unref();
+}
+
 async function handleMessage(msg) {
   switch (msg.type) {
     case "ready":
@@ -618,18 +658,11 @@ async function handleMessage(msg) {
         goalYear: String(answers.goalYear || companyConfig.goalYear || "").trim(),
         goalMonth: String(answers.goalMonth || companyConfig.goalMonth || "").trim(),
         needs: String(answers.needs || companyConfig.needs || "").trim(),
+        tone: String(answers.tone || companyConfig.tone || "").trim(),
+        taboos: String(answers.taboos || companyConfig.taboos || "").trim(),
         updatedAt: new Date().toISOString()
       });
-      const summary = [
-        `# ${companyName}`,
-        "",
-        `- 한 줄 소개: ${companyConfig.oneLiner || ""}`,
-        `- 대상: ${companyConfig.audience || ""}`,
-        `- 올해 목표: ${companyConfig.goalYear || ""}`,
-        `- 이번 달 목표: ${companyConfig.goalMonth || ""}`,
-        `- 필요한 것: ${companyConfig.needs || ""}`
-      ].join("\n");
-      fs.writeFileSync(path.join(dir, "_shared", "company.md"), summary, "utf8");
+      writeCompanySharedFiles();
       postCorporateReady();
       post(companyState({
         configured: true,
@@ -648,25 +681,46 @@ async function handleMessage(msg) {
           audience: companyConfig.audience || "",
           goalYear: companyConfig.goalYear || "",
           goalMonth: companyConfig.goalMonth || "",
-          needs: companyConfig.needs || ""
+          needs: companyConfig.needs || "",
+          tone: companyConfig.tone || "",
+          taboos: companyConfig.taboos || ""
         }
       });
       break;
     case "saveCompanyConfig": {
       const cfg = msg.config || {};
+      const field = (key, fallback = "") => Object.prototype.hasOwnProperty.call(cfg, key)
+        ? String(cfg[key] || "").trim()
+        : String(fallback || "").trim();
       saveCompanyConfig({
         configured: true,
         companyName: String(cfg.name || cfg.companyName || companyConfig.companyName || "AI 1인 기업").trim(),
-        oneLiner: String(cfg.oneLiner || companyConfig.oneLiner || "").trim(),
-        audience: String(cfg.audience || companyConfig.audience || "").trim(),
-        goalYear: String(cfg.goalYear || companyConfig.goalYear || "").trim(),
-        goalMonth: String(cfg.goalMonth || companyConfig.goalMonth || "").trim(),
-        needs: String(cfg.needs || companyConfig.needs || "").trim(),
+        oneLiner: field("oneLiner", companyConfig.oneLiner),
+        audience: field("audience", companyConfig.audience),
+        goalYear: field("goalYear", companyConfig.goalYear),
+        goalMonth: field("goalMonth", companyConfig.goalMonth),
+        needs: field("needs", companyConfig.needs),
+        tone: field("tone", companyConfig.tone),
+        taboos: field("taboos", companyConfig.taboos),
         updatedAt: new Date().toISOString()
       });
+      writeCompanySharedFiles();
       post({ type: "companyConfigSaved", ok: true });
       postCorporateReady();
       post(companyState({ configured: true, companyName: companyConfig.companyName }));
+      break;
+    }
+    case "openCompanyFolder": {
+      const sub = String(msg.sub || "").replace(/^[/\\]+/, "");
+      const base = ensureCompanyStructure();
+      const target = path.resolve(base, sub || ".");
+      if (!isInside(base, target)) {
+        post("error", "회사 공용 드라이브 경로가 허용 범위를 벗어났습니다.");
+        break;
+      }
+      ensureDir(target);
+      openFolder(target);
+      post("response", `회사 공용 드라이브를 열었습니다:\n${target}`);
       break;
     }
     default:
